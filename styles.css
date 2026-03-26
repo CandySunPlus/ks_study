@@ -192,6 +192,15 @@ h1 {
     background-color: #c0392b;
 }
 
+.btn-info {
+    background-color: #17a2b8;
+    color: white;
+}
+
+.btn-info:hover {
+    background-color: #138496;
+}
+
 /* Data Management */
 .data-management {
     display: flex;
@@ -354,6 +363,26 @@ h1 {
     background: #f8d7da;
     color: #721c24;
     border: 2px solid #dc3545;
+}
+
+/* Analysis Content */
+.analysis-content {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
+    text-align: left;
+    font-weight: normal;
+}
+
+.analysis-label {
+    font-weight: bold;
+    margin-bottom: 8px;
+    color: inherit;
+}
+
+.analysis-text {
+    line-height: 1.6;
+    font-size: 1rem;
 }
 
 /* Short Answer Components */

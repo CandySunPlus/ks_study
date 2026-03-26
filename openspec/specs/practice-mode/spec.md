@@ -48,6 +48,24 @@ The system SHALL display whether the answer is correct or incorrect immediately 
 - **WHEN** user answers incorrectly
 - **THEN** system displays which options are correct with visual indicators
 
+### Requirement: Show analysis after submission
+The system SHALL display the question analysis (if available) after the user submits an answer.
+
+#### Scenario: Show analysis after correct answer
+- **WHEN** user submits a correct answer
+- **AND** the question has an analysis field
+- **THEN** system displays the analysis content below the feedback message
+
+#### Scenario: Show analysis after incorrect answer
+- **WHEN** user submits an incorrect answer
+- **AND** the question has an analysis field
+- **THEN** system displays the analysis content below the feedback message
+
+#### Scenario: No analysis for question
+- **WHEN** user submits an answer
+- **AND** the question does not have an analysis field
+- **THEN** system only shows the feedback message without analysis section
+
 ### Requirement: Navigate between questions
 The system SHALL allow users to navigate to next/previous questions using buttons, keyboard shortcuts, or the navigation panel.
 

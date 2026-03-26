@@ -8,6 +8,7 @@ const state = {
     currentQuestionIndex: 0,
     questions: [],
     isReviewMode: false,
+    isMemorizeMode: false, // Track memorize mode state
     sessionAnswers: {}, // Track answers in current session
     questionsCache: {}, // Cache loaded questions
     navigationPanelOpen: true, // Navigation panel state
@@ -89,6 +90,11 @@ const SessionState = {
 // Helper function to detect type 3 (short-answer) questions
 function isType3Question(question) {
     return question.type === 3;
+}
+
+function isWrongQuestion(questionId) {
+    const wrongIds = WrongAnswers.get(state.currentSubject);
+    return wrongIds.includes(questionId);
 }
 
 function initializeQuestionStatuses() {
@@ -389,7 +395,8 @@ const QuestionLoader = {
                         type: q.type, // 0 = single-choice, 1 = multiple-choice
                         answerOptions: q.answerOptions,
                         answer: q.answer, // Array of correct answer indices (as strings)
-                        score: q.score
+                        score: q.score,
+                        analysis: q.analysis
                     });
                 });
             }
@@ -408,7 +415,7 @@ function showView(viewName) {
 
     if (viewName === 'dashboard') {
         document.getElementById('dashboard-view').style.display = 'block';
-    } else if (viewName === 'practice' || viewName === 'review') {
+    } else if (viewName === 'practice' || viewName === 'review' || viewName === 'memorize') {
         document.getElementById('practice-view').style.display = 'block';
     }
 
@@ -431,7 +438,13 @@ function renderNavigationPanel() {
         box.setAttribute('aria-label', `跳转到题目 ${index + 1}`);
 
         // Determine status
-        const status = state.questionStatuses[index] || 'unanswered';
+        let status = state.questionStatuses[index] || 'unanswered';
+
+        // In memorize mode, override status for wrong questions
+        if (state.isMemorizeMode && isWrongQuestion(question.questionId)) {
+            status = 'incorrect';
+        }
+
         box.classList.add(status);
 
         // Highlight current question
@@ -611,6 +624,7 @@ function renderSubjects() {
                 <button class="btn btn-warning" onclick="startReview('${subject.name}')" ${wrongCount === 0 ? 'disabled' : ''}>
                     复习错题 (${wrongCount})
                 </button>
+                <button class="btn btn-info" onclick="startMemorize('${subject.name}')">背题模式</button>
             </div>
         `;
         container.appendChild(card);
@@ -624,6 +638,7 @@ function renderSubjects() {
 async function startPractice(subject) {
     state.currentSubject = subject;
     state.isReviewMode = false;
+    state.isMemorizeMode = false;
     state.currentQuestionIndex = 0;
     state.sessionAnswers = {};
 
@@ -670,6 +685,7 @@ async function startPractice(subject) {
 async function startReview(subject) {
     state.currentSubject = subject;
     state.isReviewMode = true;
+    state.isMemorizeMode = false;
     state.currentQuestionIndex = 0;
     state.sessionAnswers = {};
 
@@ -722,24 +738,87 @@ async function startReview(subject) {
     }
 }
 
+async function startMemorize(subject) {
+    state.currentSubject = subject;
+    state.isReviewMode = false;
+    state.isMemorizeMode = true;
+    state.currentQuestionIndex = 0;
+    state.sessionAnswers = {};
+
+    const questions = await QuestionLoader.load(subject);
+    state.questions = questions;
+
+    if (questions.length === 0) {
+        alert('没有可用的题目');
+        return;
+    }
+
+    // Initialize question statuses
+    initializeQuestionStatuses();
+
+    // Load panel state from sessionStorage
+    state.navigationPanelOpen = SessionState.getNavigationPanelOpen();
+
+    showView('memorize');
+    document.getElementById('mode-icon').textContent = '📖';
+    document.getElementById('no-questions-message').style.display = 'none';
+
+    // Render navigation panel
+    renderNavigationPanel();
+
+    // Show/hide panel based on saved state
+    const panel = document.getElementById('navigation-panel');
+    const icon = document.getElementById('nav-panel-icon');
+    if (state.navigationPanelOpen) {
+        panel.style.display = 'flex';
+        panel.classList.add('open');
+        icon.textContent = '✕';
+    } else {
+        panel.style.display = 'none';
+        panel.classList.remove('open');
+        icon.textContent = '☰';
+    }
+
+    renderQuestion();
+}
+
 function renderQuestion() {
     const question = state.questions[state.currentQuestionIndex];
     if (!question) return;
 
     // Update counter
-    const counterText = state.isReviewMode
-        ? `复习 ${state.currentQuestionIndex + 1}/${state.questions.length}`
-        : `练习 ${state.currentQuestionIndex + 1}/${state.questions.length}`;
+    let counterText;
+    if (state.isMemorizeMode) {
+        counterText = `背题 ${state.currentQuestionIndex + 1}/${state.questions.length}`;
+    } else if (state.isReviewMode) {
+        counterText = `复习 ${state.currentQuestionIndex + 1}/${state.questions.length}`;
+    } else {
+        counterText = `练习 ${state.currentQuestionIndex + 1}/${state.questions.length}`;
+    }
     document.getElementById('question-counter').textContent = counterText;
 
-    // Update title
-    document.getElementById('question-title').textContent = question.title;
+    // Update title (with wrong question marker in memorize mode)
+    let titleText = question.title;
+    if (state.isMemorizeMode && isWrongQuestion(question.questionId)) {
+        titleText = '❌ ' + titleText;
+    }
+    document.getElementById('question-title').textContent = titleText;
 
-    // Branch based on question type
-    if (isType3Question(question)) {
-        renderShortAnswerQuestion(question);
+    // Branch based on mode and question type
+    if (state.isMemorizeMode) {
+        // Memorize mode - show answers directly
+        if (isType3Question(question)) {
+            renderShortAnswerQuestion(question);
+        } else {
+            renderMemorizeChoiceQuestion(question);
+        }
     } else {
-        renderMultipleChoiceQuestion(question);
+        // Practice/Review mode - normal flow
+        if (isType3Question(question)) {
+            renderShortAnswerQuestion(question);
+        } else {
+            renderMultipleChoiceQuestion(question);
+        }
     }
 
     // Update navigation panel highlight
@@ -803,6 +882,56 @@ function renderMultipleChoiceQuestion(question) {
     updateOptionStyles();
 }
 
+function renderMemorizeChoiceQuestion(question) {
+    // Render options with correct answer highlighted
+    const optionsContainer = document.getElementById('answer-options');
+    optionsContainer.innerHTML = '';
+
+    const inputType = question.type === 0 ? 'radio' : 'checkbox';
+    const inputName = question.type === 0 ? 'answer' : '';
+    const correctAnswers = question.answer.map(a => String(a));
+
+    question.answerOptions.forEach((option, index) => {
+        const optionDiv = document.createElement('div');
+        const isCorrect = correctAnswers.includes(String(index));
+        optionDiv.className = 'option' + (isCorrect ? ' correct' : '');
+
+        optionDiv.innerHTML = `
+            <input type="${inputType}"
+                   ${inputName ? `name="${inputName}"` : ''}
+                   id="option-${index}"
+                   value="${index}"
+                   ${isCorrect ? 'checked' : ''}
+                   disabled>
+            <label class="option-label" for="option-${index}">
+                ${String.fromCharCode(65 + index)}. ${option.content}
+            </label>
+        `;
+
+        optionsContainer.appendChild(optionDiv);
+    });
+
+    // Show analysis if exists (without the "correct answer" feedback message)
+    const feedbackEl = document.getElementById('feedback');
+    const messageEl = document.getElementById('feedback-message');
+
+    if (question.analysis && question.analysis.trim()) {
+        feedbackEl.style.display = 'block';
+        feedbackEl.className = 'feedback correct';
+        messageEl.style.display = 'none'; // Hide the feedback message
+        renderAnalysis(question);
+    } else {
+        // No analysis, hide feedback area completely
+        feedbackEl.style.display = 'none';
+        messageEl.style.display = 'none';
+    }
+
+    // Hide submit button (not needed in memorize mode)
+    document.getElementById('submit-btn').style.display = 'none';
+    document.getElementById('prev-btn').disabled = state.currentQuestionIndex === 0;
+    document.getElementById('next-btn').disabled = false;
+}
+
 function renderShortAnswerQuestion(question) {
     const optionsContainer = document.getElementById('answer-options');
     optionsContainer.innerHTML = '';
@@ -810,19 +939,8 @@ function renderShortAnswerQuestion(question) {
     const questionId = question.questionId;
     const isRevealed = state.type3Revealed[questionId];
 
-    if (!isRevealed) {
-        // Show reveal button
-        const revealContainer = document.createElement('div');
-        revealContainer.className = 'short-answer-reveal';
-
-        const revealBtn = document.createElement('button');
-        revealBtn.className = 'reveal-btn';
-        revealBtn.textContent = '💡 显示答案';
-        revealBtn.addEventListener('click', () => revealAnswer(questionId));
-
-        revealContainer.appendChild(revealBtn);
-        optionsContainer.appendChild(revealContainer);
-    } else {
+    // In memorize mode, always show answer directly
+    if (state.isMemorizeMode || isRevealed) {
         // Show answer text
         const answerContainer = document.createElement('div');
         answerContainer.className = 'short-answer-content';
@@ -838,10 +956,41 @@ function renderShortAnswerQuestion(question) {
         answerContainer.appendChild(answerLabel);
         answerContainer.appendChild(answerText);
         optionsContainer.appendChild(answerContainer);
+
+        // In memorize mode, also show analysis (without feedback message)
+        if (state.isMemorizeMode) {
+            const feedbackEl = document.getElementById('feedback');
+            const messageEl = document.getElementById('feedback-message');
+
+            if (question.analysis && question.analysis.trim()) {
+                feedbackEl.style.display = 'block';
+                feedbackEl.className = 'feedback correct';
+                messageEl.style.display = 'none'; // Hide the feedback message
+                renderAnalysis(question);
+            } else {
+                // No analysis, hide feedback area completely
+                feedbackEl.style.display = 'none';
+                messageEl.style.display = 'none';
+            }
+        }
+    } else {
+        // Show reveal button (practice/review mode only)
+        const revealContainer = document.createElement('div');
+        revealContainer.className = 'short-answer-reveal';
+
+        const revealBtn = document.createElement('button');
+        revealBtn.className = 'reveal-btn';
+        revealBtn.textContent = '💡 显示答案';
+        revealBtn.addEventListener('click', () => revealAnswer(questionId));
+
+        revealContainer.appendChild(revealBtn);
+        optionsContainer.appendChild(revealContainer);
     }
 
-    // Hide feedback and submit button for type 3
-    document.getElementById('feedback').style.display = 'none';
+    // Hide feedback and submit button for type 3 (unless memorize mode already showed it)
+    if (!state.isMemorizeMode) {
+        document.getElementById('feedback').style.display = 'none';
+    }
     document.getElementById('submit-btn').style.display = 'none';
     document.getElementById('prev-btn').disabled = state.currentQuestionIndex === 0;
     document.getElementById('next-btn').disabled = false;
@@ -871,6 +1020,11 @@ function revealAnswer(questionId) {
 }
 
 function saveType3ViewedStatus() {
+    // Don't save viewed status in memorize mode
+    if (state.isMemorizeMode) {
+        return;
+    }
+
     // Save viewed status for current type 3 question if revealed
     const question = state.questions[state.currentQuestionIndex];
     if (question && isType3Question(question) && state.type3Revealed[question.questionId]) {
@@ -946,6 +1100,7 @@ function showFeedback(isCorrect, correctAnswers) {
 
     feedbackEl.style.display = 'block';
     feedbackEl.className = 'feedback ' + (isCorrect ? 'correct' : 'incorrect');
+    messageEl.style.display = 'block'; // Ensure message is visible
     messageEl.textContent = isCorrect ? '✓ 正确!' : '✗ 错误!';
 
     // Highlight correct and incorrect options
@@ -961,6 +1116,25 @@ function showFeedback(isCorrect, correctAnswers) {
             option.classList.add('incorrect');
         }
     });
+
+    // Show analysis if available
+    const question = state.questions[state.currentQuestionIndex];
+    renderAnalysis(question);
+}
+
+function renderAnalysis(question) {
+    const analysisEl = document.getElementById('analysis-content');
+
+    if (question.analysis && question.analysis.trim()) {
+        analysisEl.innerHTML = `
+            <div class="analysis-label">📖 解析：</div>
+            <div class="analysis-text">${question.analysis}</div>
+        `;
+        analysisEl.style.display = 'block';
+    } else {
+        analysisEl.innerHTML = '';
+        analysisEl.style.display = 'none';
+    }
 }
 
 function nextQuestion() {
@@ -999,14 +1173,15 @@ function exitPractice() {
 // ============================================================================
 
 document.addEventListener('keydown', (e) => {
-    if (state.currentView !== 'practice' && state.currentView !== 'review') {
+    // Support practice, review, and memorize modes
+    if (state.currentView !== 'practice' && state.currentView !== 'review' && state.currentView !== 'memorize') {
         return;
     }
 
     const key = e.key.toLowerCase();
 
-    // A, B, C, D for selecting options
-    if (['a', 'b', 'c', 'd'].includes(key)) {
+    // A, B, C, D for selecting options (only in practice/review mode, not memorize mode)
+    if (['a', 'b', 'c', 'd'].includes(key) && !state.isMemorizeMode) {
         const index = key.charCodeAt(0) - 97; // a=0, b=1, c=2, d=3
         const input = document.getElementById(`option-${index}`);
         if (input && !input.disabled) {
@@ -1023,8 +1198,8 @@ document.addEventListener('keydown', (e) => {
         e.preventDefault();
     }
 
-    // Enter to submit or reveal
-    if (key === 'enter') {
+    // Enter to submit or reveal (not in memorize mode)
+    if (key === 'enter' && !state.isMemorizeMode) {
         const question = state.questions[state.currentQuestionIndex];
         if (isType3Question(question) && !state.type3Revealed[question.questionId]) {
             // Reveal type 3 answer
@@ -1039,8 +1214,8 @@ document.addEventListener('keydown', (e) => {
         e.preventDefault();
     }
 
-    // Space to reveal type 3 answers
-    if (key === ' ') {
+    // Space to reveal type 3 answers (not in memorize mode)
+    if (key === ' ' && !state.isMemorizeMode) {
         const question = state.questions[state.currentQuestionIndex];
         if (isType3Question(question) && !state.type3Revealed[question.questionId]) {
             revealAnswer(question.questionId);
