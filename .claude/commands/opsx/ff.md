@@ -1,30 +1,17 @@
 ---
-name: openspec-propose
-description: 一步提案新变更并生成所有产出物。当用户想要快速描述他们想要构建的内容，并获得包含设计、规格说明和任务的完整提案以准备实现时使用。
-license: MIT
-compatibility: 需要 openspec CLI。
-metadata:
-  author: openspec
-  version: "1.0"
-  generatedBy: "1.2.0-2"
+name: "OPSX: 快进"
+description: 一键创建变更并生成实现所需的所有产出物
+category: 工作流
+tags: [workflow, artifacts, experimental]
 ---
 
-提案新变更 - 一步创建变更并生成所有产出物。
+快速完成产出物创建 - 生成开始实现所需的一切。
 
-我将创建一个包含以下产出物的变更：
-- proposal.md（什么和为什么）
-- design.md（如何）
-- tasks.md（实现步骤）
-
-准备好实现后，运行 /opsx:apply
-
----
-
-**输入**：用户的请求应包含变更名称（kebab-case）或对他们想要构建内容的描述。
+**输入**：`/opsx:ff` 之后的参数是变更名称（kebab-case），或用户想要构建内容的描述。
 
 **步骤**
 
-1. **如果没有提供明确的输入，询问他们想要构建什么**
+1. **如果没有提供输入，询问他们想要构建什么**
 
    使用 **AskUserQuestion tool**（开放式，无预设选项）询问：
    > "您想要处理什么变更？请描述您想要构建或修复的内容。"
@@ -37,7 +24,7 @@ metadata:
    ```bash
    openspec-cn new change "<name>"
    ```
-   这将在 `openspec/changes/<name>/` 创建一个带有 `.openspec.yaml` 的脚手架变更。
+   这将在 `openspec/changes/<name>/` 创建一个脚手架变更。
 
 3. **获取产出物构建顺序**
    ```bash
@@ -62,7 +49,7 @@ metadata:
         - `context`：项目背景（对你的约束 - 不要包含在输出中）
         - `rules`：产出物特定规则（对你的约束 - 不要包含在输出中）
         - `template`：用于输出文件的结构
-        - `instruction`：此产出物类型的 Schema 特定指导
+        - `instruction`：此产出物类型的模式特定指导
         - `outputPath`：写入产出物的位置
         - `dependencies`：已完成的产出物，用于读取上下文
       - 读取任何已完成的依赖文件以获取上下文
@@ -90,17 +77,14 @@ metadata:
 - 变更名称和位置
 - 已创建产出物的列表及简要描述
 - 准备就绪："所有产出物已创建！准备好实现。"
-- 提示："运行 `/opsx:apply` 或要求我实现以开始处理任务。"
+- 提示："运行 `/opsx:apply` 以开始实现。"
 
 **产出物创建指南**
 
 - 遵循每个产出物类型的 `openspec-cn instructions` 中的 `instruction` 字段
 - Schema 定义了每个产出物应包含的内容 - 遵循它
 - 在创建新产出物之前阅读依赖产出物以获取上下文
-- 使用 `template` 作为输出文件的结构 - 填充其各个部分
-- **重要提示**：`context` 和 `rules` 是对你的约束，而不是文件内容
-  - 不要将 `<context>`、`<rules>`、`<project_context>` 块复制到产出物中
-  - 这些引导你编写内容，但不应出现在输出中
+- 使用 `template` 作为起点，根据上下文填写
 
 **护栏**
 - 创建实现所需的所有产出物（由 Schema 的 `apply.requires` 定义）

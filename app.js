@@ -98,11 +98,11 @@ function initializeQuestionStatuses() {
         const questionId = question.questionId;
 
         // Try persistent storage first
-        const persistedStatus = AnsweredQuestions.get(state.currentSubject, questionId);
-        if (persistedStatus) {
-            state.questionStatuses[index] = persistedStatus;
+        const persistedData = AnsweredQuestions.get(state.currentSubject, questionId);
+        if (persistedData) {
+            state.questionStatuses[index] = persistedData.status;
             // For type 3 questions, also update reveal state
-            if (isType3Question(question) && persistedStatus === 'viewed') {
+            if (isType3Question(question) && persistedData.status === 'viewed') {
                 state.type3Revealed[questionId] = true;
             }
             return;
@@ -127,21 +127,41 @@ function initializeQuestionStatuses() {
 const AnsweredQuestions = {
     get(subject, questionId) {
         const answeredQuestions = Storage.get('answeredQuestions', {});
-        return answeredQuestions[subject]?.[questionId] || null;
+        const value = answeredQuestions[subject]?.[questionId];
+        if (value === undefined || value === null) {
+            return null;
+        }
+        // Handle legacy format (plain string status)
+        if (typeof value === 'string') {
+            return { status: value, selected: null };
+        }
+        // New format: { status, selected }
+        return value;
     },
 
-    set(subject, questionId, status) {
+    set(subject, questionId, status, selected = null) {
         const answeredQuestions = Storage.get('answeredQuestions', {});
         if (!answeredQuestions[subject]) {
             answeredQuestions[subject] = {};
         }
-        answeredQuestions[subject][questionId] = status;
+        // Store as object with both status and selected answers
+        answeredQuestions[subject][questionId] = { status, selected };
         Storage.set('answeredQuestions', answeredQuestions);
     },
 
     getAll(subject) {
         const answeredQuestions = Storage.get('answeredQuestions', {});
-        return answeredQuestions[subject] || {};
+        const data = answeredQuestions[subject] || {};
+        // Normalize all values to new format
+        const normalized = {};
+        for (const [questionId, value] of Object.entries(data)) {
+            if (typeof value === 'string') {
+                normalized[questionId] = { status: value, selected: null };
+            } else {
+                normalized[questionId] = value;
+            }
+        }
+        return normalized;
     },
 
     clear(subject) {
@@ -157,6 +177,21 @@ const AnsweredQuestions = {
         Storage.set('answeredQuestions', answeredQuestions);
     }
 };
+
+// Helper function to restore session answers from persistent storage
+function restoreSessionAnswersFromStorage(subject) {
+    const answeredData = AnsweredQuestions.getAll(subject);
+    for (const [questionId, data] of Object.entries(answeredData)) {
+        // Only restore if we have selected answers (new format)
+        if (data.selected !== null) {
+            const isCorrect = data.status === 'correct';
+            state.sessionAnswers[questionId] = {
+                selected: data.selected,
+                isCorrect: isCorrect
+            };
+        }
+    }
+}
 
 // ============================================================================
 // Wrong Answers Management
@@ -253,6 +288,7 @@ const Stats = {
 const DataManager = {
     export() {
         const data = {
+            version: 2,  // Version 2 includes selected answers
             wrongAnswers: WrongAnswers.getAll(),
             stats: Stats.getAll(),
             answeredQuestions: Storage.get('answeredQuestions', {}),
@@ -602,6 +638,9 @@ async function startPractice(subject) {
     // Initialize question statuses
     initializeQuestionStatuses();
 
+    // Restore session answers from persistent storage
+    restoreSessionAnswersFromStorage(subject);
+
     // Load panel state from sessionStorage
     state.navigationPanelOpen = SessionState.getNavigationPanelOpen();
 
@@ -644,6 +683,9 @@ async function startReview(subject) {
 
     // Initialize question statuses
     initializeQuestionStatuses();
+
+    // Restore session answers from persistent storage
+    restoreSessionAnswersFromStorage(subject);
 
     // Load panel state from sessionStorage
     state.navigationPanelOpen = SessionState.getNavigationPanelOpen();
@@ -712,14 +754,20 @@ function renderMultipleChoiceQuestion(question) {
     const inputType = question.type === 0 ? 'radio' : 'checkbox';
     const inputName = question.type === 0 ? 'answer' : '';
 
+    // Check for previously selected answers in this session
+    const sessionAnswer = state.sessionAnswers[question.questionId];
+    const previouslySelected = sessionAnswer ? sessionAnswer.selected : [];
+
     question.answerOptions.forEach((option, index) => {
         const optionDiv = document.createElement('div');
         optionDiv.className = 'option';
+        const isChecked = previouslySelected.includes(String(index));
         optionDiv.innerHTML = `
             <input type="${inputType}"
                    ${inputName ? `name="${inputName}"` : ''}
                    id="option-${index}"
-                   value="${index}">
+                   value="${index}"
+                   ${isChecked ? 'checked' : ''}>
             <label class="option-label" for="option-${index}">
                 ${String.fromCharCode(65 + index)}. ${option.content}
             </label>
@@ -870,7 +918,7 @@ function submitAnswer() {
     state.sessionAnswers[question.questionId] = { selected, isCorrect };
 
     // Update persistent answered questions tracking
-    AnsweredQuestions.set(state.currentSubject, question.questionId, isCorrect ? 'correct' : 'incorrect');
+    AnsweredQuestions.set(state.currentSubject, question.questionId, isCorrect ? 'correct' : 'incorrect', selected);
 
     // Update stats
     Stats.update(state.currentSubject, isCorrect);
