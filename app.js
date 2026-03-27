@@ -1251,6 +1251,11 @@ function submitAnswer() {
 
     // Disable submit button
     document.getElementById('submit-btn').disabled = true;
+
+    // Auto-advance to next question if correct (only for choice questions, not type 3 or memorize mode)
+    if (isCorrect && !isType3Question(question) && !state.isMemorizeMode) {
+        setTimeout(() => nextQuestion(), 300);
+    }
 }
 
 function showFeedback(isCorrect, correctAnswers) {
