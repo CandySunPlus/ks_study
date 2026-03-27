@@ -797,6 +797,11 @@ function renderQuestion() {
     }
     document.getElementById('question-counter').textContent = counterText;
 
+    // Update progress bar
+    const progressPct = ((state.currentQuestionIndex + 1) / state.questions.length) * 100;
+    const progressBar = document.getElementById('progress-bar');
+    if (progressBar) progressBar.style.width = progressPct + '%';
+
     // Update title (with wrong question marker in memorize mode)
     let titleText = question.title;
     if (state.isMemorizeMode && isWrongQuestion(question.questionId)) {
