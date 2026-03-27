@@ -29,6 +29,14 @@
             </div>
         </div>
 
+        <!-- Practice Mode Settings Card -->
+        <div id="practice-mode-card" class="practice-mode-card" style="display: none;">
+            <span class="card-icon">📝</span>
+            <span class="card-label">练习模式：</span>
+            <span class="card-value" id="current-mode-display">随机练习</span>
+            <button id="clear-mode-btn" class="btn btn-secondary btn-small">修改模式</button>
+        </div>
+
         <div id="subjects-container" class="subjects-container">
             <!-- Subject cards will be rendered here -->
         </div>
@@ -97,6 +105,44 @@
             </div>
             <div id="question-grid" class="question-grid" role="grid" aria-label="题目网格">
                 <!-- Question grid will be rendered here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Practice Mode Selection Modal -->
+    <div id="mode-selection-modal" class="modal" style="display: none;">
+        <div class="modal-overlay"></div>
+        <div class="modal-content">
+            <h2 class="modal-title">选择练习模式</h2>
+
+            <div class="mode-options">
+                <label class="mode-option">
+                    <input type="radio" name="practice-mode" value="sequential" checked>
+                    <div class="mode-option-content">
+                        <span class="mode-option-title">顺序练习</span>
+                        <span class="mode-option-desc">按题目原始顺序依次练习</span>
+                    </div>
+                </label>
+
+                <label class="mode-option">
+                    <input type="radio" name="practice-mode" value="random">
+                    <div class="mode-option-content">
+                        <span class="mode-option-title">随机练习</span>
+                        <span class="mode-option-desc">每次进入随机打乱题目顺序</span>
+                    </div>
+                </label>
+            </div>
+
+            <div class="modal-remember">
+                <label>
+                    <input type="checkbox" id="remember-mode-choice">
+                    <span>记住我的选择</span>
+                </label>
+            </div>
+
+            <div class="modal-actions">
+                <button id="modal-start-btn" class="btn btn-primary">开始练习</button>
+                <button id="modal-cancel-btn" class="btn btn-secondary">取消</button>
             </div>
         </div>
     </div>

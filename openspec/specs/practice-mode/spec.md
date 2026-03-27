@@ -90,27 +90,32 @@ The system SHALL allow users to navigate to next/previous questions using button
 - **THEN** system shows completion message or returns to dashboard
 
 ### Requirement: Track answer status
-The system SHALL track which questions have been answered and whether they were correct or incorrect, storing this information persistently across sessions.
+The system SHALL track which questions have been answered and whether they were correct or incorrect, storing this information persistently across sessions. In random mode, the system MUST use questionId rather than question index for tracking.
 
 #### Scenario: Mark question as answered
 - **WHEN** user submits an answer
 - **THEN** system marks the question as completed in both the session state and persistent storage
+- **AND** system uses questionId as the storage key, not the question position index
 
 #### Scenario: Allow re-answering
 - **WHEN** user navigates back to a previously answered question
 - **THEN** system allows re-selecting and re-submitting the answer
+- **AND** in random mode, system correctly identifies and restores the question's answer status
 
 #### Scenario: Persist answer status across sessions
 - **WHEN** user answers questions and then closes the browser
 - **THEN** system stores the answer status in localStorage
+- **AND** storage uses questionId as key, ensuring random order does not affect status tracking
 
 #### Scenario: Restore answer status on session start
 - **WHEN** user starts a new practice session after previously answering questions
 - **THEN** system loads the answer statuses from localStorage and initializes the session state
+- **AND** in random mode, system correctly restores each question's status based on questionId
 
 #### Scenario: Update persistent storage on re-answer
 - **WHEN** user re-answers a previously answered question
 - **THEN** system updates both the session state and the persistent storage with the new status
+- **AND** update operation is based on questionId, unaffected by question order
 
 ### Requirement: Display navigation panel
 The system SHALL display a collapsible navigation panel showing all questions with status indicators.
@@ -168,4 +173,63 @@ The system SHALL track different status types for different question types (corr
 - **WHEN** starting a practice session
 - **THEN** system loads both answered statuses (correct/incorrect) and viewed statuses from localStorage
 - **AND** system displays appropriate colors in navigation panel for each type
+
+### Requirement: Support random question order
+The system MUST support randomly shuffling question order, deciding question presentation order based on user's selected practice mode.
+
+#### Scenario: Load questions in sequential mode
+- **WHEN** user selects "Sequential Practice" mode to enter practice
+- **THEN** system presents questions in their original order from the JSON file
+- **AND** question numbers in the navigation panel correspond to original positions
+
+#### Scenario: Shuffle questions in random mode
+- **WHEN** user selects "Random Practice" mode to enter practice
+- **THEN** system randomly shuffles question order using Fisher-Yates shuffle algorithm
+- **AND** question numbers in the navigation panel correspond to shuffled positions
+
+#### Scenario: Re-shuffle on each entry in random mode
+- **WHEN** user selects "Random Practice" mode to enter practice
+- **AND** user has previously entered this subject in random mode
+- **THEN** system generates a new random order (does not reuse previous random order)
+
+#### Scenario: Random mode does not save random seed
+- **WHEN** user enters practice in random mode
+- **THEN** system does not save the random order to localStorage or sessionStorage
+- **AND** next entry will generate a different random order
+
+### Requirement: Display current practice mode
+The system MUST clearly display the current practice mode being used on the practice page.
+
+#### Scenario: Sequential mode display
+- **WHEN** user enters practice in sequential mode
+- **THEN** practice page title displays "📝 练习模式"
+- **AND** no additional mode identifier is shown
+
+#### Scenario: Random mode display
+- **WHEN** user enters practice in random mode
+- **THEN** practice page title displays "📝 练习模式 🔀"
+- **AND** 🔀 emoji clearly identifies current as random mode
+
+### Requirement: Maintain existing functionality
+Random question order MUST NOT affect answer status tracking, wrong answer recording, and other existing features.
+
+#### Scenario: Answer status based on questionId
+- **WHEN** user answers questions in random mode
+- **THEN** system uses questionId rather than question position index to track answer status
+- **AND** answer status is correctly saved to localStorage
+
+#### Scenario: Wrong answer recording unaffected
+- **WHEN** user answers a question incorrectly in random mode
+- **THEN** system correctly records the question's questionId to the wrong answers list
+- **AND** review mode can correctly load this wrong answer
+
+#### Scenario: Navigation panel status displays correctly
+- **WHEN** user answers questions in random mode
+- **THEN** question number status (✓✗) in navigation panel correctly reflects answer results
+- **AND** clicking navigation panel question numbers correctly jumps to corresponding questions
+
+#### Scenario: Answer selection restore functions normally
+- **WHEN** user returns to a previously answered question after answering in random mode
+- **THEN** system correctly restores user's previous answer selection
+- **AND** displays previous answer results and feedback
 

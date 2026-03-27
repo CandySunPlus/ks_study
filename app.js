@@ -9,6 +9,7 @@ const state = {
     questions: [],
     isReviewMode: false,
     isMemorizeMode: false, // Track memorize mode state
+    isRandomMode: false, // Track random mode state
     sessionAnswers: {}, // Track answers in current session
     questionsCache: {}, // Cache loaded questions
     navigationPanelOpen: true, // Navigation panel state
@@ -26,6 +27,30 @@ const SUBJECTS = [
     { name: '习近平新时代', file: '习近平新时代.json' },
     { name: '中国近代史纲要_2', file: '中国近代史纲要_2.json' }
 ];
+
+// ============================================================================
+// Utility Functions
+// ============================================================================
+
+/**
+ * Fisher-Yates shuffle algorithm - randomly shuffles an array
+ * @param {Array} array - The array to shuffle
+ * @returns {Array} A new shuffled array (does not modify the original)
+ *
+ * Algorithm explanation:
+ * - Iterate from the last element to the first
+ * - For each position i, pick a random index j from 0 to i
+ * - Swap elements at positions i and j
+ * - This ensures uniform random distribution
+ */
+function shuffle(array) {
+    const result = [...array]; // Create a copy to avoid modifying the original
+    for (let i = result.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [result[i], result[j]] = [result[j], result[i]];
+    }
+    return result;
+}
 
 // ============================================================================
 // Local Storage Functions
@@ -579,6 +604,31 @@ async function showDashboard() {
     });
     renderOverallStats();
     renderSubjects();
+    updatePracticeModeSettings();
+}
+
+/**
+ * Update the practice mode settings display on Dashboard
+ */
+function updatePracticeModeSettings() {
+    const preferredMode = Storage.get('preferredPracticeMode', null);
+    const settingsDiv = document.getElementById('practice-mode-card');
+    const modeDisplay = document.getElementById('current-mode-display');
+
+    if (preferredMode) {
+        settingsDiv.style.display = 'block';
+        modeDisplay.textContent = preferredMode === 'random' ? '随机练习' : '顺序练习';
+    } else {
+        settingsDiv.style.display = 'none';
+    }
+}
+
+/**
+ * Clear the saved practice mode preference
+ */
+function clearPracticeMode() {
+    Storage.set('preferredPracticeMode', null);
+    updatePracticeModeSettings();
 }
 
 function renderOverallStats() {
@@ -632,10 +682,105 @@ function renderSubjects() {
 }
 
 // ============================================================================
+// Practice Mode Selection Modal
+// ============================================================================
+
+/**
+ * Show the practice mode selection modal and return the user's choice
+ * @returns {Promise<string>} Resolves to 'sequential' or 'random', or null if cancelled
+ */
+function showModeSelectionModal() {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('mode-selection-modal');
+        const overlay = modal.querySelector('.modal-overlay');
+        const startBtn = document.getElementById('modal-start-btn');
+        const cancelBtn = document.getElementById('modal-cancel-btn');
+        const rememberCheckbox = document.getElementById('remember-mode-choice');
+        const radioButtons = modal.querySelectorAll('input[name="practice-mode"]');
+
+        // Reset modal state
+        const sequentialRadio = modal.querySelector('input[value="sequential"]');
+        sequentialRadio.checked = true;
+        rememberCheckbox.checked = false;
+
+        // Show modal
+        modal.style.display = 'flex';
+
+        // Handle start button click
+        const handleStart = () => {
+            const selectedMode = modal.querySelector('input[name="practice-mode"]:checked').value;
+            const remember = rememberCheckbox.checked;
+
+            // Save preference if "remember" is checked
+            if (remember) {
+                Storage.set('preferredPracticeMode', selectedMode);
+            }
+
+            // Hide modal
+            modal.style.display = 'none';
+
+            // Clean up listeners
+            cleanup();
+
+            // Resolve with selected mode
+            resolve(selectedMode);
+        };
+
+        // Handle cancel button click
+        const handleCancel = () => {
+            modal.style.display = 'none';
+            cleanup();
+            resolve(null);
+        };
+
+        // Handle ESC key
+        const handleEsc = (e) => {
+            if (e.key === 'Escape') {
+                handleCancel();
+            }
+        };
+
+        // Handle overlay click
+        const handleOverlayClick = () => {
+            handleCancel();
+        };
+
+        // Cleanup function
+        const cleanup = () => {
+            startBtn.removeEventListener('click', handleStart);
+            cancelBtn.removeEventListener('click', handleCancel);
+            overlay.removeEventListener('click', handleOverlayClick);
+            document.removeEventListener('keydown', handleEsc);
+        };
+
+        // Attach event listeners
+        startBtn.addEventListener('click', handleStart);
+        cancelBtn.addEventListener('click', handleCancel);
+        overlay.addEventListener('click', handleOverlayClick);
+        document.addEventListener('keydown', handleEsc);
+    });
+}
+
+// ============================================================================
 // Practice Mode
 // ============================================================================
 
 async function startPractice(subject) {
+    // Check for saved practice mode preference
+    const preferredMode = Storage.get('preferredPracticeMode', null);
+
+    // If no preference, show modal to get user choice
+    let mode;
+    if (preferredMode === null) {
+        mode = await showModeSelectionModal();
+        // If user cancelled, return to dashboard
+        if (mode === null) {
+            return;
+        }
+    } else {
+        mode = preferredMode;
+    }
+
     state.currentSubject = subject;
     state.isReviewMode = false;
     state.isMemorizeMode = false;
@@ -643,11 +788,19 @@ async function startPractice(subject) {
     state.sessionAnswers = {};
 
     const questions = await QuestionLoader.load(subject);
-    state.questions = questions;
 
     if (questions.length === 0) {
         alert('没有可用的题目');
         return;
+    }
+
+    // Apply shuffle if random mode is selected
+    if (mode === 'random') {
+        state.questions = shuffle(questions);
+        state.isRandomMode = true;
+    } else {
+        state.questions = questions;
+        state.isRandomMode = false;
     }
 
     // Initialize question statuses
@@ -660,7 +813,8 @@ async function startPractice(subject) {
     state.navigationPanelOpen = SessionState.getNavigationPanelOpen();
 
     showView('practice');
-    document.getElementById('mode-icon').textContent = '📝';
+    // Display mode icon based on random mode state
+    document.getElementById('mode-icon').textContent = state.isRandomMode ? '📝 🔀' : '📝';
     document.getElementById('no-questions-message').style.display = 'none';
 
     // Render navigation panel
@@ -1106,7 +1260,7 @@ function showFeedback(isCorrect, correctAnswers) {
     feedbackEl.style.display = 'block';
     feedbackEl.className = 'feedback ' + (isCorrect ? 'correct' : 'incorrect');
     messageEl.style.display = 'block'; // Ensure message is visible
-    messageEl.textContent = isCorrect ? '✓ 正确!' : '✗ 错误!';
+    messageEl.textContent = isCorrect ? '正确!' : '错误!'; // Icon added by CSS ::before
 
     // Highlight correct and incorrect options
     const options = document.querySelectorAll('.option');
@@ -1269,6 +1423,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     document.getElementById('clear-btn').addEventListener('click', DataManager.clear);
+    document.getElementById('clear-mode-btn').addEventListener('click', clearPracticeMode);
 
     // Practice view buttons
     document.getElementById('exit-practice-btn').addEventListener('click', exitPractice);
