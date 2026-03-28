@@ -66,3 +66,14 @@ The system SHALL display a navigation panel showing only the wrong answers being
 - **WHEN** user clicks a question number in the review mode navigation panel
 - **THEN** system displays that wrong answer question
 
+### Requirement: Review mode must not restore previous answers
+The system SHALL prevent restoring previously selected answer options when entering review mode. All questions must be displayed in a blank state, requiring users to re-select answers.
+
+#### Scenario: Enter review mode
+- **WHEN** user clicks "复习错题"
+- **THEN** all wrong answer questions are displayed with no options selected, without showing previous selections
+
+#### Scenario: Correct answer during review
+- **WHEN** user correctly answers a previously wrong question in review mode
+- **THEN** the question is removed from the wrong answers list and answer records are updated normally
+

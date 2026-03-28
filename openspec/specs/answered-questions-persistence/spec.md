@@ -77,3 +77,23 @@ The system SHALL use a consistent data structure for storing answer statuses tha
 - **WHEN** system stores or retrieves status
 - **THEN** system uses only "correct" or "incorrect" as status values (no other strings)
 
+### Requirement: Display results for answered choice questions
+- **WHEN** In practice mode, when a user navigates to a previously answered choice question, the system SHALL:
+- **THEN** Select the previously chosen options and set them to disabled
+- **AND** Highlight the correct option(s) in green
+- **AND** Highlight incorrectly chosen options in red
+- **AND** Display the question's analysis content
+- **AND** Hide the submit button
+- **AND** Prevent answer modification
+
+#### Scenario: Navigate to a previously correct question
+- **WHEN** user navigates to a previously correctly answered choice question
+- **THEN** the previously selected options are displayed as disabled with green highlighting, analysis is shown, and the submit button is hidden
+
+#### Scenario: Navigate to a previously incorrect question
+- **WHEN** user navigates to a previously incorrectly answered choice question
+- **THEN** the previously selected options are displayed as disabled with red highlighting, the correct answer is highlighted in green, analysis is shown, and the submit button is hidden
+
+#### Scenario: Navigate to an unanswered question
+- **WHEN** user navigates to an unanswered question
+- **THEN** options and the submit button are displayed normally, allowing the user to answer

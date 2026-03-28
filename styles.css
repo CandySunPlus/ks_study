@@ -84,71 +84,6 @@ header p {
     font-size: 0.95rem;
 }
 
-/* ===== Practice Mode Settings Card ===== */
-.practice-mode-card {
-    background: var(--bg-card);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-md);
-    padding: 14px 20px;
-    margin: 0 auto 24px;
-    max-width: 100%;
-    border: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-.practice-mode-card .card-icon {
-    font-size: 1.1rem;
-    flex-shrink: 0;
-}
-
-.practice-mode-card .card-label {
-    font-size: 0.95rem;
-    color: var(--text-secondary);
-    font-weight: 500;
-    flex-shrink: 0;
-}
-
-.practice-mode-card .card-value {
-    font-size: 0.95rem;
-    font-weight: 600;
-    color: var(--primary);
-    flex-shrink: 0;
-}
-
-.practice-mode-card .btn-small {
-    padding: 6px 14px;
-    font-size: 0.9rem;
-    flex-shrink: 0;
-    margin-left: auto;
-}
-
-@media (max-width: 768px) {
-    .practice-mode-card {
-        padding: 12px 16px;
-        margin-bottom: 20px;
-        gap: 8px;
-    }
-
-    .practice-mode-card .card-icon {
-        font-size: 1rem;
-    }
-
-    .practice-mode-card .card-label {
-        font-size: 0.85rem;
-    }
-
-    .practice-mode-card .card-value {
-        font-size: 0.85rem;
-    }
-
-    .practice-mode-card .btn-small {
-        padding: 6px 12px;
-        font-size: 0.85rem;
-    }
-}
-
 /* ===== Overall Statistics ===== */
 .overall-stats {
     display: flex;
@@ -1166,7 +1101,19 @@ input[type="checkbox"]:focus {
     display: flex;
     flex-direction: column;
     gap: 12px;
+}
+
+.mode-group {
     margin-bottom: 20px;
+}
+
+.mode-group-title {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    margin-bottom: 10px;
 }
 
 .mode-option {
@@ -1221,32 +1168,6 @@ input[type="checkbox"]:focus {
     border-color: var(--primary);
     background: var(--primary-light);
     box-shadow: var(--shadow-focus);
-}
-
-.modal-remember {
-    display: flex;
-    align-items: center;
-    padding: 12px 16px;
-    background: var(--bg-subtle);
-    border-radius: var(--radius-sm);
-    margin-bottom: 24px;
-}
-
-.modal-remember label {
-    display: flex;
-    align-items: center;
-    cursor: pointer;
-    font-size: 0.95rem;
-    color: var(--text-secondary);
-    user-select: none;
-}
-
-.modal-remember input[type="checkbox"] {
-    width: 18px;
-    height: 18px;
-    margin-right: 10px;
-    cursor: pointer;
-    accent-color: var(--primary);
 }
 
 .modal-actions {

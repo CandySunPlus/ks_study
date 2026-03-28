@@ -224,6 +224,13 @@ function restoreSessionAnswersFromStorage(subject) {
     }
 }
 
+// Clear all data for a specific subject
+function clearSubjectData(subject) {
+    AnsweredQuestions.clear(subject);
+    WrongAnswers.clear(subject);
+    Stats.clear(subject);
+}
+
 // ============================================================================
 // Wrong Answers Management
 // ============================================================================
@@ -260,6 +267,14 @@ const WrongAnswers = {
     getTotalCount() {
         const wrongAnswers = this.getAll();
         return Object.values(wrongAnswers).reduce((sum, arr) => sum + arr.length, 0);
+    },
+
+    clear(subject) {
+        const wrongAnswers = Storage.get('wrongAnswers', {});
+        if (subject) {
+            delete wrongAnswers[subject];
+        }
+        Storage.set('wrongAnswers', wrongAnswers);
     }
 };
 
@@ -309,6 +324,14 @@ const Stats = {
             totals.wrong += stat.wrong;
         });
         return totals;
+    },
+
+    clear(subject) {
+        const stats = Storage.get('stats', {});
+        if (subject) {
+            delete stats[subject];
+        }
+        Storage.set('stats', stats);
     }
 };
 
@@ -604,31 +627,6 @@ async function showDashboard() {
     });
     renderOverallStats();
     renderSubjects();
-    updatePracticeModeSettings();
-}
-
-/**
- * Update the practice mode settings display on Dashboard
- */
-function updatePracticeModeSettings() {
-    const preferredMode = Storage.get('preferredPracticeMode', null);
-    const settingsDiv = document.getElementById('practice-mode-card');
-    const modeDisplay = document.getElementById('current-mode-display');
-
-    if (preferredMode) {
-        settingsDiv.style.display = 'block';
-        modeDisplay.textContent = preferredMode === 'random' ? '随机练习' : '顺序练习';
-    } else {
-        settingsDiv.style.display = 'none';
-    }
-}
-
-/**
- * Clear the saved practice mode preference
- */
-function clearPracticeMode() {
-    Storage.set('preferredPracticeMode', null);
-    updatePracticeModeSettings();
 }
 
 function renderOverallStats() {
@@ -695,13 +693,12 @@ function showModeSelectionModal() {
         const overlay = modal.querySelector('.modal-overlay');
         const startBtn = document.getElementById('modal-start-btn');
         const cancelBtn = document.getElementById('modal-cancel-btn');
-        const rememberCheckbox = document.getElementById('remember-mode-choice');
-        const radioButtons = modal.querySelectorAll('input[name="practice-mode"]');
 
         // Reset modal state
         const sequentialRadio = modal.querySelector('input[value="sequential"]');
+        const continueRadio = modal.querySelector('input[value="continue"]');
         sequentialRadio.checked = true;
-        rememberCheckbox.checked = false;
+        continueRadio.checked = true;
 
         // Show modal
         modal.style.display = 'flex';
@@ -709,12 +706,7 @@ function showModeSelectionModal() {
         // Handle start button click
         const handleStart = () => {
             const selectedMode = modal.querySelector('input[name="practice-mode"]:checked').value;
-            const remember = rememberCheckbox.checked;
-
-            // Save preference if "remember" is checked
-            if (remember) {
-                Storage.set('preferredPracticeMode', selectedMode);
-            }
+            const dataMode = modal.querySelector('input[name="data-mode"]:checked').value;
 
             // Hide modal
             modal.style.display = 'none';
@@ -722,8 +714,8 @@ function showModeSelectionModal() {
             // Clean up listeners
             cleanup();
 
-            // Resolve with selected mode
-            resolve(selectedMode);
+            // Resolve with both selections
+            resolve({ mode: selectedMode, dataMode });
         };
 
         // Handle cancel button click
@@ -766,19 +758,18 @@ function showModeSelectionModal() {
 // ============================================================================
 
 async function startPractice(subject) {
-    // Check for saved practice mode preference
-    const preferredMode = Storage.get('preferredPracticeMode', null);
+    // Always show modal for user to choose mode and data option
+    const selection = await showModeSelectionModal();
+    // If user cancelled, return to dashboard
+    if (selection === null) {
+        return;
+    }
 
-    // If no preference, show modal to get user choice
-    let mode;
-    if (preferredMode === null) {
-        mode = await showModeSelectionModal();
-        // If user cancelled, return to dashboard
-        if (mode === null) {
-            return;
-        }
-    } else {
-        mode = preferredMode;
+    const { mode, dataMode } = selection;
+
+    // If fresh start, clear all data for this subject
+    if (dataMode === 'fresh') {
+        clearSubjectData(subject);
     }
 
     state.currentSubject = subject;
@@ -806,8 +797,10 @@ async function startPractice(subject) {
     // Initialize question statuses
     initializeQuestionStatuses();
 
-    // Restore session answers from persistent storage
-    restoreSessionAnswersFromStorage(subject);
+    // Restore session answers from persistent storage (only if continuing)
+    if (dataMode === 'continue') {
+        restoreSessionAnswersFromStorage(subject);
+    }
 
     // Load panel state from sessionStorage
     state.navigationPanelOpen = SessionState.getNavigationPanelOpen();
@@ -853,9 +846,6 @@ async function startReview(subject) {
 
     // Initialize question statuses
     initializeQuestionStatuses();
-
-    // Restore session answers from persistent storage
-    restoreSessionAnswersFromStorage(subject);
 
     // Load panel state from sessionStorage
     state.navigationPanelOpen = SessionState.getNavigationPanelOpen();
@@ -996,6 +986,11 @@ function renderMultipleChoiceQuestion(question) {
     const sessionAnswer = state.sessionAnswers[question.questionId];
     const previouslySelected = sessionAnswer ? sessionAnswer.selected : [];
 
+    // Check if this question has already been answered (in practice mode with continue)
+    const isAlreadyAnswered = sessionAnswer !== undefined && previouslySelected.length > 0;
+
+    const correctAnswers = question.answer.map(a => String(a));
+
     question.answerOptions.forEach((option, index) => {
         const optionDiv = document.createElement('div');
         optionDiv.className = 'option';
@@ -1005,36 +1000,64 @@ function renderMultipleChoiceQuestion(question) {
                    ${inputName ? `name="${inputName}"` : ''}
                    id="option-${index}"
                    value="${index}"
-                   ${isChecked ? 'checked' : ''}>
+                   ${isChecked ? 'checked' : ''}
+                   ${isAlreadyAnswered ? 'disabled' : ''}>
             <label class="option-label" for="option-${index}">
                 ${String.fromCharCode(65 + index)}. ${option.content}
             </label>
         `;
 
-        // Add click handler for the entire option div
-        optionDiv.addEventListener('click', (e) => {
-            if (e.target.tagName !== 'INPUT') {
-                const input = optionDiv.querySelector('input');
-                if (question.type === 0) {
-                    // Radio button - select this one
-                    input.checked = true;
-                } else {
-                    // Checkbox - toggle
-                    input.checked = !input.checked;
-                }
-                updateOptionStyles();
+        if (isAlreadyAnswered) {
+            optionDiv.classList.add('disabled');
+            // Highlight correct answers green
+            if (correctAnswers.includes(String(index))) {
+                optionDiv.classList.add('correct');
             }
-        });
+            // Highlight incorrectly selected answers red
+            if (isChecked && !correctAnswers.includes(String(index))) {
+                optionDiv.classList.add('incorrect');
+            }
+        } else {
+            // Add click handler for the entire option div
+            optionDiv.addEventListener('click', (e) => {
+                if (e.target.tagName !== 'INPUT') {
+                    const input = optionDiv.querySelector('input');
+                    if (question.type === 0) {
+                        input.checked = true;
+                    } else {
+                        input.checked = !input.checked;
+                    }
+                    updateOptionStyles();
+                }
+            });
+        }
 
         optionsContainer.appendChild(optionDiv);
     });
 
-    // Hide feedback
-    document.getElementById('feedback').style.display = 'none';
+    if (isAlreadyAnswered) {
+        // Show feedback and analysis for already answered questions
+        const feedbackEl = document.getElementById('feedback');
+        const messageEl = document.getElementById('feedback-message');
+        const isCorrect = sessionAnswer.isCorrect;
 
-    // Show submit button, reset button states
-    document.getElementById('submit-btn').style.display = 'inline-block';
-    document.getElementById('submit-btn').disabled = false;
+        feedbackEl.style.display = 'block';
+        feedbackEl.className = 'feedback ' + (isCorrect ? 'correct' : 'incorrect');
+        messageEl.style.display = 'block';
+        messageEl.textContent = isCorrect ? '正确!' : '错误!';
+        renderAnalysis(question);
+
+        // Hide submit button
+        document.getElementById('submit-btn').style.display = 'none';
+    } else {
+        // Hide feedback
+        document.getElementById('feedback').style.display = 'none';
+
+        // Show submit button, reset button states
+        document.getElementById('submit-btn').style.display = 'inline-block';
+        document.getElementById('submit-btn').disabled = false;
+    }
+
     document.getElementById('prev-btn').disabled = state.currentQuestionIndex === 0;
     document.getElementById('next-btn').disabled = false;
 
@@ -1428,7 +1451,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     document.getElementById('clear-btn').addEventListener('click', DataManager.clear);
-    document.getElementById('clear-mode-btn').addEventListener('click', clearPracticeMode);
 
     // Practice view buttons
     document.getElementById('exit-practice-btn').addEventListener('click', exitPractice);
