@@ -527,12 +527,12 @@ function toggleNavigationPanel() {
     if (state.navigationPanelOpen) {
         panel.classList.add('open');
         panel.style.display = 'flex';
-        icon.textContent = '✕';
+        icon.textContent = '关闭';
         // Scroll to current question
         scrollToCurrentQuestion();
     } else {
         panel.classList.remove('open');
-        icon.textContent = '☰';
+        icon.textContent = '导航';
         // Hide after animation
         setTimeout(() => {
             if (!state.navigationPanelOpen) {
@@ -806,8 +806,6 @@ async function startPractice(subject) {
     state.navigationPanelOpen = SessionState.getNavigationPanelOpen();
 
     showView('practice');
-    // Display mode icon based on random mode state
-    document.getElementById('mode-icon').textContent = state.isRandomMode ? '📝 🔀' : '📝';
     document.getElementById('no-questions-message').style.display = 'none';
 
     // Render navigation panel
@@ -819,11 +817,11 @@ async function startPractice(subject) {
     if (state.navigationPanelOpen) {
         panel.style.display = 'flex';
         panel.classList.add('open');
-        icon.textContent = '✕';
+        icon.textContent = '关闭';
     } else {
         panel.style.display = 'none';
         panel.classList.remove('open');
-        icon.textContent = '☰';
+        icon.textContent = '导航';
     }
 
     renderQuestion();
@@ -851,7 +849,6 @@ async function startReview(subject) {
     state.navigationPanelOpen = SessionState.getNavigationPanelOpen();
 
     showView('review');
-    document.getElementById('mode-icon').textContent = '🔄';
 
     if (state.questions.length === 0) {
         document.getElementById('question-container').style.display = 'none';
@@ -871,11 +868,11 @@ async function startReview(subject) {
         if (state.navigationPanelOpen) {
             panel.style.display = 'flex';
             panel.classList.add('open');
-            icon.textContent = '✕';
+            icon.textContent = '关闭';
         } else {
             panel.style.display = 'none';
             panel.classList.remove('open');
-            icon.textContent = '☰';
+            icon.textContent = '导航';
         }
 
         renderQuestion();
@@ -904,7 +901,6 @@ async function startMemorize(subject) {
     state.navigationPanelOpen = SessionState.getNavigationPanelOpen();
 
     showView('memorize');
-    document.getElementById('mode-icon').textContent = '📖';
     document.getElementById('no-questions-message').style.display = 'none';
 
     // Render navigation panel
@@ -916,11 +912,11 @@ async function startMemorize(subject) {
     if (state.navigationPanelOpen) {
         panel.style.display = 'flex';
         panel.classList.add('open');
-        icon.textContent = '✕';
+        icon.textContent = '关闭';
     } else {
         panel.style.display = 'none';
         panel.classList.remove('open');
-        icon.textContent = '☰';
+        icon.textContent = '导航';
     }
 
     renderQuestion();
